@@ -1,6 +1,6 @@
 import React from "react";
 import ClientFeatureFlagsProvider from "@/core_components/feature_flags/FeatureFlagsProvider";
-import { getFeatureFlags } from "@/core_components/services/featureFlagServices";
+import { getFeatureFlags, revalidateFeatureFlags } from "@/core_components/services/featureFlagServices";
 
 // Server component wrapper: fetch flags on the server, then hydrate a client context.
 export default async function FeatureFlagsServerProvider({

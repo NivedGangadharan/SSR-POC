@@ -18,17 +18,11 @@ export default async function CategoryProductsGrid({ categoryId, page = 1, limit
     const session = await getSession();
     const data: GetProductsResponseModel = await getProducts(categoryId, limit, page);
     const totalItems = typeof data.itemCount === "number" ? data.itemCount : undefined;
+
     if (totalItems && page > Math.ceil(totalItems / limit)) {
         redirect(`/categories/${categoryId}?page=${Math.ceil(totalItems / limit)}&limit=${limit}`);
     }
-    async function loadMore(nextPage: number, nextLimit: number) {
-        "use server";
-        const res = await getProducts(categoryId, nextLimit, nextPage);
-        return {
-            products: res.products,
-            itemCount: typeof res.itemCount === "number" ? res.itemCount : null,
-        };
-    }
+
     return (
         <Box mb={10}>
             {showCategoryName && data.categoryName && (
@@ -72,7 +66,7 @@ export default async function CategoryProductsGrid({ categoryId, page = 1, limit
                     );
                 })}
                 {/* Infinite scroller appends more items below */}
-                <CategoryInfiniteScrollerClient categoryId={categoryId} startPage={page} limit={limit} isSignedIn={!!session} loadMore={loadMore} />
+                <CategoryInfiniteScrollerClient categoryId={categoryId} startPage={page} limit={limit} isSignedIn={!!session} />
             </Box>
         </Box>
     );

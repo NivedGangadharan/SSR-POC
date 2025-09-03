@@ -2,6 +2,7 @@ import { Container } from "@mui/material";
 import ClothsTable from "@/component_library/products/products_table/ClothsTable";
 import { decodeSearchTerm } from "@/core_components/utils/searchCodec";
 import { getFeatureFlags } from "@/core_components/services/featureFlagServices";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,16 @@ type SearchParams = Record<string, string | string[] | undefined>;
 type Props = { searchParams?: SearchParams | Promise<SearchParams> };
 
 export default async function ClothsPage({ searchParams }: Props) {
+    // Feature flag guard: if disabled, return 404
+    try {
+        const flags = await getFeatureFlags();
+        if (!flags.shirts) {
+            return notFound();
+        }
+    } catch {
+        // If fetching flags fails, treat as disabled by default
+        return notFound();
+    }
     const categoryId = 51570;
     const awaited = await searchParams;
     const pageRaw = awaited?.page;

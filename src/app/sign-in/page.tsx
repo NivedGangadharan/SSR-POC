@@ -1,10 +1,12 @@
 "use client";
 import { Box, Button, Paper, Stack, TextField, Typography, Alert, LinearProgress } from "@mui/material";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,8 @@ export default function SignInPage() {
         setError(body?.message || "Sign in failed");
         return;
       }
-      router.push("/");
+      const dest = returnUrl && returnUrl.startsWith("/") ? returnUrl : "/";
+      router.push(dest);
       router.refresh();
     });
   }

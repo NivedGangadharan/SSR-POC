@@ -19,17 +19,17 @@ type Props = {
     limit: number;
     categoryId: number;
     isSignedIn: boolean;
-    loadMore: (page: number, limit: number) => Promise<LoadMoreResult>;
 };
 
 export default function CategoryInfiniteScrollerClient({ startPage, limit, isSignedIn, categoryId }: Props) {
     const [page, setPage] = useState(startPage + 1);
     const [items, setItems] = useState<Product[]>([]);
     const [hasMore, setHasMore] = useState(true);
-    const [isPending, startTransition] = useTransition();
+    const [isLoading, setIsLoading] = useState(false);
+    const [, startTransition] = useTransition(); // isPending not needed for the spinner
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    async function loadMore(nextPage: number, nextLimit: number) {
+    async function loadMore(nextPage: number, nextLimit: number): Promise<LoadMoreResult> {
         const res = await getProducts(categoryId, nextLimit, nextPage);
         return {
             products: res.products,
@@ -40,14 +40,20 @@ export default function CategoryInfiniteScrollerClient({ startPage, limit, isSig
     useEffect(() => {
         const el = sentinelRef.current;
         if (!el) return;
-        const io = new IntersectionObserver((entries) => {
-            const entry = entries[0];
-            if (entry.isIntersecting && hasMore && !isPending) {
+
+        const io = new IntersectionObserver(
+            (entries) => {
+                const entry = entries[0];
+                if (!entry.isIntersecting) return;
+                if (!hasMore || isLoading) return;
+
+                setIsLoading(true);
                 startTransition(() => {
                     loadMore(page, limit)
                         .then((data) => {
                             const newItems: Product[] = data.products ?? [];
                             setItems((prev) => [...prev, ...newItems]);
+
                             const total = typeof data.itemCount === "number" ? data.itemCount : null;
                             if (total !== null) {
                                 const shown = page * limit;
@@ -55,15 +61,23 @@ export default function CategoryInfiniteScrollerClient({ startPage, limit, isSig
                             } else {
                                 setHasMore(newItems.length === limit);
                             }
+
                             setPage((p) => p + 1);
                         })
-                        .catch(() => setHasMore(false));
+                        .catch(() => {
+                            setHasMore(false);
+                        })
+                        .finally(() => {
+                            setIsLoading(false);
+                        });
                 });
-            }
-        }, { rootMargin: "200px 0px" });
+            },
+            { rootMargin: "200px 0px" }
+        );
+
         io.observe(el);
         return () => io.disconnect();
-    }, []);
+    }, [page, limit, hasMore, isLoading]); // ensure fresh state inside observer
 
     return (
         <>
@@ -99,9 +113,9 @@ export default function CategoryInfiniteScrollerClient({ startPage, limit, isSig
                 );
             })}
             <div ref={sentinelRef} />
-            {isPending && (
-                <Box sx={{ display: 'flex', position: 'absolute', bottom: -50, justifyContent: 'center', py: 2, width: '100%' }}>
-                    <CircularProgress size={24} thickness={5} sx={{ color: '#fff' }} />
+            {isLoading && (
+                <Box sx={{ display: 'flex', position: 'fixed', bottom: 50, left: 0, right: 0, justifyContent: 'center', py: 2, zIndex: 10 }}>
+                    <CircularProgress size={24} thickness={5} />
                 </Box>
             )}
             {!hasMore && (

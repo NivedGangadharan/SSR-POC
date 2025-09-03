@@ -1,4 +1,5 @@
-import axios from "axios";
+import { revalidateTag } from "next/cache";
+import { cache } from "react";
 
 // A map of feature flags like { "shirts": true, "table_pagination": false }
 export type FeatureFlag = Record<string, boolean>;
@@ -29,32 +30,39 @@ function normalizeFlags(input: unknown): FeatureFlag {
     return out;
 }
 
-export async function getFeatureFlags(): Promise<FeatureFlag> {
-    let lastError: unknown = undefined;
-    try {
-        const resp = await axios.get<unknown>(
-            `https://raw.githubusercontent.com/NivedGangadharan/dummy_json/main/db.json`,
-            {
-                headers: { Accept: "application/json" },
-                timeout: 8000,
-                // Important: do not reuse the project AxiosInstance (it has RapidAPI base/headers)
-                // and avoid sending any auth headers to GitHub.
-                validateStatus: (s) => s >= 200 && s < 300,
-            }
-        );
-        return normalizeFlags(resp.data);
-    } catch (err) {
-        lastError = err;
-        // fallthrough to error below
-    }
+const FLAGS_URL = "https://raw.githubusercontent.com/NivedGanga/dummy_json/main/db.json";
 
-    const e = new Error("Unable to fetch feature flags from remote source");
-    (e as unknown as { cause?: unknown }).cause = lastError;
-    throw e;
+// Fetch using Next.js fetch for built-in request-level deduping
+async function fetchFlags(): Promise<FeatureFlag> {
+    console.log("callingggg");
+    const res = await fetch(FLAGS_URL, {
+        // Let Next cache for 60s (ISR) and allow tag-based revalidation
+        // Also enables request-level dedupe between layout and page
+        next: { revalidate: 6, tags: ["feature-flags"] },
+        headers: { Accept: "application/json" },
+        // A small timeout via AbortController if needed could be added by callers if required
+    });
+    console.log("fetch completed")
+    if (!res.ok) {
+        // On non-2xx, treat as empty flags
+        return {};
+    }
+    
+    const data = await res.json();
+    return normalizeFlags(data as unknown);
+}
+
+// React cache() dedupes within the same server render/request even if called from multiple files
+export const getFeatureFlags = cache(async () => fetchFlags());
+
+// Optional: allow manual revalidation by tag from server actions or route handlers
+export function revalidateFeatureFlags() {
+    revalidateTag("feature-flags");
 }
 
 const featureFlagServices = {
     getFeatureFlags,
+    revalidateFeatureFlags,
 };
 
 export default featureFlagServices;
